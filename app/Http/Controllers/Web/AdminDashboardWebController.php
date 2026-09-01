@@ -139,12 +139,39 @@ class AdminDashboardWebController extends Controller
     public function crawlers(): View
     {
         $nodes = CrawlerNode::orderBy('updated_at', 'desc')->paginate(15);
+        $todayStart = now()->startOfDay();
+
+        foreach ($nodes as $node) {
+            $node->active_jobs_count = CrawlJob::where('crawler_id', $node->crawler_id)->where('status', 'claimed')->count();
+            $node->completed_today_count = CrawlJob::where('crawler_id', $node->crawler_id)->where('status', 'completed')->where('completed_at', '>=', $todayStart)->count();
+            $node->failed_today_count = CrawlJob::where('crawler_id', $node->crawler_id)->where('status', 'failed')->where('failed_at', '>=', $todayStart)->count();
+            $node->total_completed_count = CrawlJob::where('crawler_id', $node->crawler_id)->where('status', 'completed')->count();
+            
+            // Get the list of 30 domains currently locked and being crawled by this worker
+            $node->active_domains = CrawlJob::with('domain')
+                ->where('crawler_id', $node->crawler_id)
+                ->where('status', 'claimed')
+                ->limit(30)
+                ->get();
+        }
+
         return view('admin.crawlers', compact('nodes'));
     }
 
-    public function jobs(): View
+    public function jobs(Request $request): View
     {
-        $jobs = CrawlJob::with(['domain', 'attempts'])->orderBy('created_at', 'desc')->paginate(15);
+        $query = CrawlJob::with(['domain', 'attempts']);
+
+        if ($request->filled('status')) {
+            $query->where('status', $request->input('status'));
+        }
+
+        if ($request->filled('crawler_id')) {
+            $query->where('crawler_id', $request->input('crawler_id'));
+        }
+
+        $jobs = $query->orderBy('created_at', 'desc')->paginate(15)->withQueryString();
+
         return view('admin.jobs', compact('jobs'));
     }
 }

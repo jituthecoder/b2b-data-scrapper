@@ -8,8 +8,13 @@
 <div class="table-card">
     <div class="table-header">
         <h2 class="table-title">Crawl Jobs Queue ({{ $jobs->total() }})</h2>
-        <form method="GET" action="/admin/jobs" style="display: flex; gap: 12px;">
-            <select name="status" class="search-box" style="width: 150px;">
+        <form method="GET" action="/admin/jobs" style="display: flex; gap: 12px; align-items: center;">
+            @if(request('crawler_id'))
+                <input type="hidden" name="crawler_id" value="{{ request('crawler_id') }}">
+                <span class="badge badge-info" style="font-family: monospace;">Worker: {{ Str::limit(request('crawler_id'), 15) }}</span>
+                <a href="/admin/jobs" style="color: #ff5555; text-decoration: none; font-size: 12px;">Clear Filter</a>
+            @endif
+            <select name="status" class="search-box" style="width: 150px;" onchange="this.form.submit()">
                 <option value="">All Statuses</option>
                 <option value="pending" {{ request('status') === 'pending' ? 'selected' : '' }}>Pending</option>
                 <option value="claimed" {{ request('status') === 'claimed' ? 'selected' : '' }}>Claimed</option>
