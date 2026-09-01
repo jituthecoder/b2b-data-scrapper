@@ -31,6 +31,7 @@ class Domain extends Model
         'final_url',
         'canonical_url',
         'screenshot_url',
+        'favicon_url',
         'first_discovered_at',
         'last_crawled_at',
         'next_crawl_at',

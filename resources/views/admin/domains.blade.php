@@ -61,7 +61,10 @@
             <tr>
                 <td>{{ $d->id }}</td>
                 <td style="font-weight: 700;">
-                    <a href="/admin/domains/{{ $d->id }}" style="color: var(--cyan); text-decoration: none;">
+                    <a href="/admin/domains/{{ $d->id }}" style="color: var(--cyan); text-decoration: none; display: inline-flex; align-items: center; gap: 8px;">
+                        @if($d->favicon_url)
+                            <img src="{{ $d->favicon_url }}" alt="" style="width: 16px; height: 16px; object-fit: contain; border-radius: 3px;">
+                        @endif
                         {{ $d->domain }} &rarr;
                     </a>
                 </td>

@@ -90,6 +90,9 @@ document.addEventListener('DOMContentLoaded', function() {
     <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 20px;">
         <div>
             <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 8px;">
+                @if($domain->favicon_url)
+                    <img src="{{ $domain->favicon_url }}" alt="{{ $domain->domain }} Favicon" style="width: 24px; height: 24px; object-fit: contain; border-radius: 4px; background: rgba(255,255,255,0.08); padding: 2px;">
+                @endif
                 <h1 style="font-family: 'Outfit', sans-serif; font-size: 26px; font-weight: 800; color: #fff;">{{ $domain->domain }}</h1>
                 <span class="badge badge-info">{{ strtoupper($domain->tld) }}</span>
                 @if($domain->is_accessible === true)

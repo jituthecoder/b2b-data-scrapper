@@ -47,7 +47,8 @@ class ProcessCrawlResultJob implements ShouldQueue
         GoogleFacebookDiscoveryService $facebookDiscovery,
         GoogleEmailHarvestingService $emailHarvester,
         CompanyLogoStorageService $logoStorage,
-        WebsiteScreenshotStorageService $screenshotStorage
+        WebsiteScreenshotStorageService $screenshotStorage,
+        FaviconStorageService $faviconStorage
     ): void {
         $job = CrawlJob::find($this->jobId);
         if (!$job) {
@@ -84,6 +85,11 @@ class ProcessCrawlResultJob implements ShouldQueue
             if ($host) {
                 $updates['www_variant'] = str_starts_with(strtolower($host), 'www.');
             }
+        }
+
+        // Process Favicon Icon Storage on S3
+        if (!empty($domainStatus['favicon_url'])) {
+            $faviconStorage->storeFavicon($domain, $domainStatus['favicon_url']);
         }
 
         // STAGE 1: Reachability Check
