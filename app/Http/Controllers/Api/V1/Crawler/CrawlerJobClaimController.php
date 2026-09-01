@@ -48,7 +48,7 @@ class CrawlerJobClaimController extends Controller
 
         // Atomically claim pending OR expired leased jobs
         $claimedJobs = DB::transaction(function () use ($allowedTypes, $limit, $node) {
-            $query = CrawlJob::where(function ($q) {
+            $query = CrawlJob::with('domain')->where(function ($q) {
                 $q->where('status', 'pending')
                   ->orWhere(function ($expired) {
                       $expired->where('status', 'claimed')
@@ -66,17 +66,22 @@ class CrawlerJobClaimController extends Controller
                 ->lockForUpdate()
                 ->get();
 
+            if ($jobs->isEmpty()) {
+                return [];
+            }
+
             $leaseExpiresAt = now()->addMinutes(10);
+            $jobIds = $jobs->pluck('id')->toArray();
+
+            CrawlJob::whereIn('id', $jobIds)->update([
+                'status' => 'claimed',
+                'crawler_id' => $node->crawler_id,
+                'claimed_at' => now(),
+                'lease_expires_at' => $leaseExpiresAt,
+            ]);
+
             $claimed = [];
-
             foreach ($jobs as $job) {
-                $job->update([
-                    'status' => 'claimed',
-                    'crawler_id' => $node->crawler_id,
-                    'claimed_at' => now(),
-                    'lease_expires_at' => $leaseExpiresAt,
-                ]);
-
                 $claimed[] = [
                     'job_id' => $job->id,
                     'domain_id' => $job->domain_id,
