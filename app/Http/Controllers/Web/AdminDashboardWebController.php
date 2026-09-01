@@ -142,15 +142,32 @@ class AdminDashboardWebController extends Controller
         $todayStart = now()->startOfDay();
 
         foreach ($nodes as $node) {
-            $node->active_jobs_count = CrawlJob::where('crawler_id', $node->crawler_id)->where('status', 'claimed')->count();
-            $node->completed_today_count = CrawlJob::where('crawler_id', $node->crawler_id)->where('status', 'completed')->where('completed_at', '>=', $todayStart)->count();
-            $node->failed_today_count = CrawlJob::where('crawler_id', $node->crawler_id)->where('status', 'failed')->where('failed_at', '>=', $todayStart)->count();
+            $node->active_jobs_count = CrawlJob::where('crawler_id', $node->crawler_id)
+                ->where('status', 'claimed')
+                ->where('lease_expires_at', '>=', now())
+                ->count();
+                
+            $node->completed_today_count = CrawlJob::where('crawler_id', $node->crawler_id)
+                ->where('status', 'completed')
+                ->where(function ($q) use ($todayStart) {
+                    $q->where('completed_at', '>=', $todayStart)
+                      ->orWhere('updated_at', '>=', $todayStart);
+                })->count();
+
+            $node->failed_today_count = CrawlJob::where('crawler_id', $node->crawler_id)
+                ->where('status', 'failed')
+                ->where(function ($q) use ($todayStart) {
+                    $q->where('failed_at', '>=', $todayStart)
+                      ->orWhere('updated_at', '>=', $todayStart);
+                })->count();
+
             $node->total_completed_count = CrawlJob::where('crawler_id', $node->crawler_id)->where('status', 'completed')->count();
             
-            // Get the list of 30 domains currently locked and being crawled by this worker
+            // Get the list of 30 active unexpired target domains currently being crawled
             $node->active_domains = CrawlJob::with('domain')
                 ->where('crawler_id', $node->crawler_id)
                 ->where('status', 'claimed')
+                ->where('lease_expires_at', '>=', now())
                 ->limit(30)
                 ->get();
         }

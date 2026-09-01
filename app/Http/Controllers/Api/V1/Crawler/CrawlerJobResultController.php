@@ -33,6 +33,7 @@ class CrawlerJobResultController extends Controller
         // Mark job status as completed
         $job->update([
             'status' => 'completed',
+            'completed_at' => now(),
         ]);
 
         // Save raw JSON payload to disk/S3 abstraction
