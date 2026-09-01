@@ -53,6 +53,12 @@ class ImportDomainsCsvCommand extends Command
                 $this->processChunk($chunk, $isSync);
                 $chunksDispatched++;
                 $chunk = [];
+
+                if ($totalProcessed % 10000 === 0) {
+                    $elapsed = round(microtime(true) - $startTime, 1);
+                    $rate = round($totalProcessed / max(1, $elapsed));
+                    $this->info("[Progress] Imported {$totalProcessed} domains ({$rate} domains/sec, Elapsed: {$elapsed}s)");
+                }
             }
         }
 

@@ -67,26 +67,23 @@ class ImportDomainChunkJob implements ShouldQueue
             ['domain', 'scheme', 'www_variant', 'tld', 'updated_at']
         );
 
-        // Fetch inserted domain IDs to create initial crawl jobs
-        $domains = Domain::whereIn('normalized_domain', array_keys($insertData))->get();
+        // Fetch inserted domain IDs to create initial crawl jobs in 1 bulk operation
+        $domains = Domain::whereIn('normalized_domain', array_keys($insertData))->select(['id'])->get();
 
         $crawlJobs = [];
         foreach ($domains as $d) {
-            // Create reachability and homepage jobs if no job exists yet
-            if ($d->crawlJobs()->count() === 0) {
-                $crawlJobs[] = [
-                    'id' => (string) Str::uuid(),
-                    'domain_id' => $d->id,
-                    'job_type' => 'homepage',
-                    'priority' => 0,
-                    'status' => 'pending',
-                    'attempt_count' => 0,
-                    'max_attempts' => 3,
-                    'idempotency_key' => 'init-homepage-' . $d->id,
-                    'created_at' => $now,
-                    'updated_at' => $now,
-                ];
-            }
+            $crawlJobs[] = [
+                'id' => (string) Str::uuid(),
+                'domain_id' => $d->id,
+                'job_type' => 'homepage',
+                'priority' => 0,
+                'status' => 'pending',
+                'attempt_count' => 0,
+                'max_attempts' => 3,
+                'idempotency_key' => 'init-homepage-' . $d->id,
+                'created_at' => $now,
+                'updated_at' => $now,
+            ];
         }
 
         if (!empty($crawlJobs)) {
