@@ -20,34 +20,36 @@ class AdminDashboardWebController extends Controller
 {
     public function index(): View
     {
-        $stats = [
-            'domains' => [
-                'total' => Domain::count(),
-                'accessible' => Domain::where('is_accessible', true)->count(),
-                'completed' => Domain::where('crawl_status', 'completed')->count(),
-            ],
-            'crawlers' => [
-                'total' => CrawlerNode::count(),
-                'active_count' => CrawlerNode::where('status', 'active')->where('last_heartbeat_at', '>=', now()->subMinutes(2))->count(),
-                'stopped_count' => CrawlerNode::where(function ($q) {
-                    $q->where('status', '!=', 'active')
-                      ->orWhereNull('last_heartbeat_at')
-                      ->orWhere('last_heartbeat_at', '<', now()->subMinutes(2));
-                })->count(),
-                'total_capacity' => CrawlerNode::sum('worker_count'),
-            ],
-            'jobs' => [
-                'pending' => CrawlJob::where('status', 'pending')->count(),
-                'claimed' => CrawlJob::where('status', 'claimed')->count(),
-                'completed' => CrawlJob::where('status', 'completed')->count(),
-            ],
-            'entities' => [
-                'companies' => Company::count(),
-                'contacts' => Contact::count(),
-                'emails' => Email::count(),
-                'technologies' => Technology::count(),
-            ],
-        ];
+        $stats = \Illuminate\Support\Facades\Cache::remember('admin_dashboard_stats', 60, function () {
+            return [
+                'domains' => [
+                    'total' => Domain::count(),
+                    'accessible' => Domain::where('is_accessible', true)->count(),
+                    'completed' => Domain::where('crawl_status', 'completed')->count(),
+                ],
+                'crawlers' => [
+                    'total' => CrawlerNode::count(),
+                    'active_count' => CrawlerNode::where('status', 'active')->where('last_heartbeat_at', '>=', now()->subMinutes(2))->count(),
+                    'stopped_count' => CrawlerNode::where(function ($q) {
+                        $q->where('status', '!=', 'active')
+                          ->orWhereNull('last_heartbeat_at')
+                          ->orWhere('last_heartbeat_at', '<', now()->subMinutes(2));
+                    })->count(),
+                    'total_capacity' => CrawlerNode::sum('worker_count'),
+                ],
+                'jobs' => [
+                    'pending' => CrawlJob::where('status', 'pending')->count(),
+                    'claimed' => CrawlJob::where('status', 'claimed')->count(),
+                    'completed' => CrawlJob::where('status', 'completed')->count(),
+                ],
+                'entities' => [
+                    'companies' => Company::count(),
+                    'contacts' => Contact::count(),
+                    'emails' => Email::count(),
+                    'technologies' => Technology::count(),
+                ],
+            ];
+        });
 
         $recentDomains = Domain::orderBy('created_at', 'desc')->limit(8)->get();
         $recentJobs = CrawlJob::with('domain')->orderBy('created_at', 'desc')->limit(8)->get();
