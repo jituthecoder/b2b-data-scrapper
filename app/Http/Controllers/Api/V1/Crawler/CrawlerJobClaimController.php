@@ -39,14 +39,12 @@ class CrawlerJobClaimController extends Controller
         if ($capabilityFilter && in_array($capabilityFilter, $capabilities, true)) {
             $allowedTypes = [$capabilityFilter];
         } else {
-            $allowedTypes = $capabilities;
+            $allowedTypes = !empty($capabilities) ? $capabilities : ['homepage', 'reachability', 'tech_detect', 'contact_discover', 'careers', 'social', 'seo', 'pagespeed'];
         }
 
-        if (empty($allowedTypes)) {
-            return response()->json([
-                'message' => 'No matching capabilities configured for worker.',
-                'jobs' => [],
-            ]);
+        // Always include 'homepage' for general web crawlers so pending homepage jobs are claimed
+        if (!in_array('homepage', $allowedTypes, true)) {
+            $allowedTypes[] = 'homepage';
         }
 
         // Automatically release any expired claimed jobs from dead workers back to pending
