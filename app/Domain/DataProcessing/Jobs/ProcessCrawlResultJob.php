@@ -125,27 +125,15 @@ class ProcessCrawlResultJob implements ShouldQueue
         $updates['crawl_status'] = 'completed';
         $domain->update($updates);
 
-        // Process Website Visual Screenshot Snapshot on S3
+        // Process Website Visual Screenshot Snapshot on S3 (Self-Hosted)
         if ($isAccessible) {
             $screenshotData = $this->payload['domain_status']['screenshot'] ?? $this->payload['screenshot'] ?? null;
-            if (!$screenshotData) {
-                try {
-                    $snapRes = Http::timeout(8)->get("https://api.microlink.io/?url=https://{$domain->normalized_domain}&screenshot=true");
-                    if ($snapRes->successful()) {
-                        $snapJson = $snapRes->json();
-                        $screenshotData = $snapJson['data']['screenshot']['url'] ?? null;
-                    }
-                } catch (\Throwable $e) {
-                    Log::warning("Microlink Screenshot Fallback Error: " . $e->getMessage());
-                }
-            }
-
             if ($screenshotData) {
                 $screenshotStorage->storeScreenshot($domain, $screenshotData);
             }
         }
 
-        // Process Company & Upload Logo to S3/Storage
+        // Process Company & Upload Extracted Logo directly to S3
         if (!empty($this->payload['company']['name'])) {
             $rawCompany = $this->payload['company']['name'];
             $normalizedCompany = $companyNormalizer->normalize($rawCompany);
@@ -161,8 +149,9 @@ class ProcessCrawlResultJob implements ShouldQueue
 
             $domain->companies()->syncWithoutDetaching([$company->id => ['is_primary' => true]]);
 
-            $logoUrlCandidate = $this->payload['company']['logo_url'] ?? null;
-            $logoStorage->storeLogo($company, $logoUrlCandidate, $domain->normalized_domain);
+            if (!empty($this->payload['company']['logo_url'])) {
+                $logoStorage->storeLogo($company, $this->payload['company']['logo_url']);
+            }
         }
 
         // Process Technologies

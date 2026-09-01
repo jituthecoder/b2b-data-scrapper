@@ -10,12 +10,8 @@ use Illuminate\Support\Str;
 
 class CompanyLogoStorageService
 {
-    public function storeLogo(Company $company, ?string $rawLogoUrl = null, ?string $domainName = null): ?string
+    public function storeLogo(Company $company, ?string $rawLogoUrl = null): ?string
     {
-        if (empty($rawLogoUrl) && !empty($domainName)) {
-            $rawLogoUrl = "https://logo.clearbit.com/" . trim($domainName);
-        }
-
         if (empty($rawLogoUrl)) return null;
 
         try {
