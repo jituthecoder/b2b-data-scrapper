@@ -34,18 +34,7 @@ class CrawlerJobClaimController extends Controller
         $node = $request->attributes->get('crawler_node');
         $limit = min((int) ($request->input('limit', 20)), 100);
         $capabilityFilter = $request->input('capability');
-
-        $capabilities = $node->capabilities ?? [];
-        if ($capabilityFilter && in_array($capabilityFilter, $capabilities, true)) {
-            $allowedTypes = [$capabilityFilter];
-        } else {
-            $allowedTypes = !empty($capabilities) ? $capabilities : ['homepage', 'reachability', 'tech_detect', 'contact_discover', 'careers', 'social', 'seo', 'pagespeed'];
-        }
-
-        // Always include 'homepage' for general web crawlers so pending homepage jobs are claimed
-        if (!in_array('homepage', $allowedTypes, true)) {
-            $allowedTypes[] = 'homepage';
-        }
+        $allowedTypes = $capabilityFilter ? [$capabilityFilter] : null;
 
         // Automatically release any expired claimed jobs from dead workers back to pending
         CrawlJob::where('status', 'claimed')
@@ -59,15 +48,19 @@ class CrawlerJobClaimController extends Controller
 
         // Atomically claim pending OR expired leased jobs
         $claimedJobs = DB::transaction(function () use ($allowedTypes, $limit, $node) {
-            $jobs = CrawlJob::where(function ($query) {
-                    $query->where('status', 'pending')
-                        ->orWhere(function ($q) {
-                            $q->where('status', 'claimed')
+            $query = CrawlJob::where(function ($q) {
+                $q->where('status', 'pending')
+                  ->orWhere(function ($expired) {
+                      $expired->where('status', 'claimed')
                               ->where('lease_expires_at', '<', now());
-                        });
-                })
-                ->whereIn('job_type', $allowedTypes)
-                ->orderBy('priority', 'desc')
+                  });
+            });
+
+            if (!empty($allowedTypes)) {
+                $query->whereIn('job_type', $allowedTypes);
+            }
+
+            $jobs = $query->orderBy('priority', 'desc')
                 ->orderBy('created_at', 'asc')
                 ->limit($limit)
                 ->lockForUpdate()
