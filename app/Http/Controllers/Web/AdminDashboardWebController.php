@@ -57,15 +57,25 @@ class AdminDashboardWebController extends Controller
 
     public function domains(Request $request): View
     {
-        $query = Domain::with(['companies', 'technologies']);
+        $query = Domain::with(['companies', 'technologies', 'emails'])->withCount('emails');
 
         if ($request->filled('search')) {
             $search = $request->input('search');
-            $query->where('domain', 'LIKE', "%{$search}%")
-                ->orWhere('normalized_domain', 'LIKE', "%{$search}%");
+            $query->where(function ($q) use ($search) {
+                $q->where('domain', 'LIKE', "%{$search}%")
+                  ->orWhere('normalized_domain', 'LIKE', "%{$search}%");
+            });
         }
 
-        $domains = $query->orderBy('created_at', 'desc')->paginate(15);
+        if ($request->input('filter') === 'with_emails') {
+            $query->has('emails');
+        } elseif ($request->input('filter') === 'accessible') {
+            $query->where('is_accessible', true);
+        } elseif ($request->input('filter') === 'completed') {
+            $query->where('crawl_status', 'completed');
+        }
+
+        $domains = $query->orderBy('created_at', 'desc')->paginate(15)->withQueryString();
 
         return view('admin.domains', compact('domains'));
     }

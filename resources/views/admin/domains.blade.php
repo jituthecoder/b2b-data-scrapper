@@ -31,7 +31,13 @@
 <div class="table-card">
     <div class="table-header">
         <h2 class="table-title">Registered Domains ({{ $domains->total() }})</h2>
-        <form method="GET" action="/admin/domains" style="display: flex; gap: 12px;">
+        <form method="GET" action="/admin/domains" style="display: flex; gap: 12px; align-items: center;">
+            <select name="filter" class="search-box" style="width: 190px;" onchange="this.form.submit()">
+                <option value="">All Domains</option>
+                <option value="with_emails" {{ request('filter') === 'with_emails' ? 'selected' : '' }}>📧 With Emails Only</option>
+                <option value="accessible" {{ request('filter') === 'accessible' ? 'selected' : '' }}>🟢 Accessible Only</option>
+                <option value="completed" {{ request('filter') === 'completed' ? 'selected' : '' }}>✅ Completed Crawl</option>
+            </select>
             <input type="text" name="search" value="{{ request('search') }}" placeholder="Search domain name..." class="search-box">
             <button type="submit" class="btn">Filter</button>
         </form>
@@ -42,10 +48,10 @@
             <tr>
                 <th>ID</th>
                 <th>Domain Name</th>
-                <th>Normalized Domain</th>
                 <th>TLD</th>
                 <th>Accessibility</th>
                 <th>Crawl Status</th>
+                <th>Extracted Emails</th>
                 <th>Companies</th>
                 <th style="text-align: right;">Actions</th>
             </tr>
@@ -59,7 +65,6 @@
                         {{ $d->domain }} &rarr;
                     </a>
                 </td>
-                <td style="color: var(--text-muted);">{{ $d->normalized_domain }}</td>
                 <td><span class="badge badge-info">{{ $d->tld }}</span></td>
                 <td>
                     @if($d->is_accessible === true)
@@ -74,6 +79,15 @@
                     <span class="badge badge-{{ $d->crawl_status === 'completed' ? 'success' : ($d->crawl_status === 'failed' ? 'danger' : 'warning') }}">
                         {{ $d->crawl_status }}
                     </span>
+                </td>
+                <td>
+                    @if(($d->emails_count ?? 0) > 0)
+                        <a href="/admin/domains/{{ $d->id }}" style="text-decoration: none;">
+                            <span class="badge badge-success">📧 {{ $d->emails_count }} Email{{ $d->emails_count > 1 ? 's' : '' }}</span>
+                        </a>
+                    @else
+                        <span style="color: var(--text-muted); font-size: 12px;">0 Emails</span>
+                    @endif
                 </td>
                 <td>
                     @forelse($d->companies as $c)
