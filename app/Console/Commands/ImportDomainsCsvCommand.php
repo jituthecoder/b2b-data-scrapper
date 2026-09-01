@@ -37,9 +37,11 @@ class ImportDomainsCsvCommand extends Command
         $chunk = [];
         $totalProcessed = 0;
         $chunksDispatched = 0;
-
         while (($data = fgetcsv($handle, 1000, ',')) !== false) {
-            $domain = trim($data[0] ?? '');
+            $raw = $data[0] ?? '';
+            $domain = trim(mb_convert_encoding((string) $raw, 'UTF-8', 'UTF-8'));
+            $domain = preg_replace('/[^\x20-\x7E]/', '', $domain);
+
             if (empty($domain) || strtolower($domain) === 'domain' || strtolower($domain) === 'url') {
                 continue;
             }
