@@ -302,6 +302,30 @@
             border-color: var(--primary);
         }
 
+        select.search-box {
+            appearance: none;
+            -webkit-appearance: none;
+            -moz-appearance: none;
+            background-image: url("data:image/svg+xml;utf8,<svg fill='%239ca3af' height='20' viewBox='0 0 24 24' width='20' xmlns='http://www.w3.org/2000/svg'><path d='M7 10l5 5 5-5z'/></svg>");
+            background-repeat: no-repeat;
+            background-position: right 10px center;
+            padding-right: 32px;
+            cursor: pointer;
+        }
+
+        select option {
+            background-color: #0d1322 !important;
+            color: #f3f4f6 !important;
+            padding: 12px;
+            font-size: 14px;
+        }
+
+        select option:checked {
+            background: #1e293b !important;
+            color: var(--cyan) !important;
+            font-weight: 600;
+        }
+
         .btn {
             background: linear-gradient(135deg, var(--primary), var(--accent));
             color: #fff;
