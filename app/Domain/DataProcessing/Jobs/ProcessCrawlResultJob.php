@@ -161,9 +161,8 @@ class ProcessCrawlResultJob implements ShouldQueue
 
             $domain->companies()->syncWithoutDetaching([$company->id => ['is_primary' => true]]);
 
-            if (!empty($this->payload['company']['logo_url'])) {
-                $logoStorage->storeLogo($company, $this->payload['company']['logo_url']);
-            }
+            $logoUrlCandidate = $this->payload['company']['logo_url'] ?? null;
+            $logoStorage->storeLogo($company, $logoUrlCandidate, $domain->normalized_domain);
         }
 
         // Process Technologies
