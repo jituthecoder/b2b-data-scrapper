@@ -47,7 +47,15 @@ class CrawlerJobClaimController extends Controller
                 'message' => 'No matching capabilities configured for worker.',
                 'jobs' => [],
             ]);
-        }
+        // Automatically release any expired claimed jobs from dead workers back to pending
+        CrawlJob::where('status', 'claimed')
+            ->where('lease_expires_at', '<', now())
+            ->update([
+                'status' => 'pending',
+                'crawler_id' => null,
+                'claimed_at' => null,
+                'lease_expires_at' => null,
+            ]);
 
         // Atomically claim pending OR expired leased jobs
         $claimedJobs = DB::transaction(function () use ($allowedTypes, $limit, $node) {
