@@ -20,27 +20,38 @@ class AdminDashboardWebController extends Controller
 {
     public function index(): View
     {
-        $stats = \Illuminate\Support\Facades\Cache::remember('admin_dashboard_stats', 60, function () {
+        $stats = \Illuminate\Support\Facades\Cache::remember('admin_dashboard_stats', 600, function () {
+            // 1. Grouped CrawlJob counts in 1 single query
+            $jobCounts = CrawlJob::select('status', \Illuminate\Support\Facades\DB::raw('COUNT(*) as total'))
+                ->groupBy('status')
+                ->pluck('total', 'status');
+
+            // 2. Domain metrics
+            $totalDomains = Domain::count();
+            $accessibleDomains = Domain::where('is_accessible', true)->count();
+            $completedDomains = Domain::where('crawl_status', 'completed')->count();
+
+            // 3. Crawler Nodes metrics
+            $totalCrawlers = CrawlerNode::count();
+            $activeCrawlers = CrawlerNode::where('status', 'active')->where('last_heartbeat_at', '>=', now()->subMinutes(2))->count();
+            $totalCapacity = CrawlerNode::sum('worker_count');
+
             return [
                 'domains' => [
-                    'total' => Domain::count(),
-                    'accessible' => Domain::where('is_accessible', true)->count(),
-                    'completed' => Domain::where('crawl_status', 'completed')->count(),
+                    'total' => $totalDomains,
+                    'accessible' => $accessibleDomains,
+                    'completed' => $completedDomains,
                 ],
                 'crawlers' => [
-                    'total' => CrawlerNode::count(),
-                    'active_count' => CrawlerNode::where('status', 'active')->where('last_heartbeat_at', '>=', now()->subMinutes(2))->count(),
-                    'stopped_count' => CrawlerNode::where(function ($q) {
-                        $q->where('status', '!=', 'active')
-                          ->orWhereNull('last_heartbeat_at')
-                          ->orWhere('last_heartbeat_at', '<', now()->subMinutes(2));
-                    })->count(),
-                    'total_capacity' => CrawlerNode::sum('worker_count'),
+                    'total' => $totalCrawlers,
+                    'active_count' => $activeCrawlers,
+                    'stopped_count' => max(0, $totalCrawlers - $activeCrawlers),
+                    'total_capacity' => (int) $totalCapacity,
                 ],
                 'jobs' => [
-                    'pending' => CrawlJob::where('status', 'pending')->count(),
-                    'claimed' => CrawlJob::where('status', 'claimed')->count(),
-                    'completed' => CrawlJob::where('status', 'completed')->count(),
+                    'pending' => (int) ($jobCounts->get('pending') ?? 0),
+                    'claimed' => (int) ($jobCounts->get('claimed') ?? 0),
+                    'completed' => (int) ($jobCounts->get('completed') ?? 0),
                 ],
                 'entities' => [
                     'companies' => Company::count(),
