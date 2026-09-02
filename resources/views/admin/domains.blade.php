@@ -30,7 +30,7 @@
 
 <div class="table-card">
     <div class="table-header">
-        <h2 class="table-title">Registered Domains ({{ $domains->total() }})</h2>
+        <h2 class="table-title">Registered Domains ({{ number_format($totalCount ?? 0) }})</h2>
         <form method="GET" action="/admin/domains" style="display: flex; gap: 12px; align-items: center;">
             <select name="filter" class="search-box" style="width: 210px;" onchange="this.form.submit()">
                 <option value="">All Domains</option>
@@ -85,9 +85,9 @@
                     </span>
                 </td>
                 <td>
-                    @if(($d->emails_count ?? 0) > 0)
+                    @if($d->emails->count() > 0)
                         <a href="/admin/domains/{{ $d->id }}" style="text-decoration: none;">
-                            <span class="badge badge-success">📧 {{ $d->emails_count }} Email{{ $d->emails_count > 1 ? 's' : '' }}</span>
+                            <span class="badge badge-success">📧 {{ $d->emails->count() }} Email{{ $d->emails->count() > 1 ? 's' : '' }}</span>
                         </a>
                     @else
                         <span style="color: var(--text-muted); font-size: 12px;">0 Emails</span>

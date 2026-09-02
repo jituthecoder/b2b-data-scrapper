@@ -59,7 +59,7 @@ class AdminDashboardWebController extends Controller
 
     public function domains(Request $request): View
     {
-        $query = Domain::with(['companies', 'technologies', 'emails'])->withCount('emails');
+        $query = Domain::with(['companies', 'technologies', 'emails']);
 
         if ($request->filled('search')) {
             $search = $request->input('search');
@@ -79,9 +79,10 @@ class AdminDashboardWebController extends Controller
             $query->where('crawl_status', 'in_progress');
         }
 
-        $domains = $query->orderBy('id', 'desc')->paginate(15)->withQueryString();
+        $totalCount = \Illuminate\Support\Facades\Cache::remember('domains_total_count', 60, fn() => Domain::count());
+        $domains = $query->orderBy('id', 'desc')->simplePaginate(15)->withQueryString();
 
-        return view('admin.domains', compact('domains'));
+        return view('admin.domains', compact('domains', 'totalCount'));
     }
 
     public function storeDomain(Request $request, DomainNormalizationService $normalizer): RedirectResponse
@@ -154,42 +155,53 @@ class AdminDashboardWebController extends Controller
     {
         $nodes = CrawlerNode::orderBy('updated_at', 'desc')->paginate(15);
         $todayStart = now()->startOfDay();
+        $nodeIds = $nodes->pluck('crawler_id')->filter()->toArray();
+
+        // 1. Grouped SQL Aggregation across all nodes in 1 SINGLE QUERY
+        $statsMap = \Illuminate\Support\Facades\Cache::remember('crawler_nodes_bulk_stats', 30, function () use ($todayStart) {
+            $nowStr = now()->toDateTimeString();
+            $isPgsql = \Illuminate\Support\Facades\DB::connection()->getDriverName() === 'pgsql';
+
+            if ($isPgsql) {
+                return CrawlJob::select(
+                        'crawler_id',
+                        \Illuminate\Support\Facades\DB::raw("COUNT(*) FILTER (WHERE status = 'claimed' AND lease_expires_at >= '{$nowStr}') as active_jobs_count"),
+                        \Illuminate\Support\Facades\DB::raw("COUNT(*) FILTER (WHERE status = 'completed' AND (completed_at >= '{$todayStart}' OR updated_at >= '{$todayStart}')) as completed_today_count"),
+                        \Illuminate\Support\Facades\DB::raw("COUNT(*) FILTER (WHERE status = 'failed' AND (failed_at >= '{$todayStart}' OR updated_at >= '{$todayStart}')) as failed_today_count"),
+                        \Illuminate\Support\Facades\DB::raw("COUNT(*) FILTER (WHERE status = 'completed') as total_completed_count")
+                    )
+                    ->whereNotNull('crawler_id')
+                    ->groupBy('crawler_id')
+                    ->get()
+                    ->keyBy('crawler_id');
+            }
+
+            return CrawlJob::select('crawler_id')
+                ->selectRaw("SUM(CASE WHEN status = 'claimed' AND lease_expires_at >= ? THEN 1 ELSE 0 END) as active_jobs_count", [$nowStr])
+                ->selectRaw("SUM(CASE WHEN status = 'completed' AND (completed_at >= ? OR updated_at >= ?) THEN 1 ELSE 0 END) as completed_today_count", [$todayStart, $todayStart])
+                ->selectRaw("SUM(CASE WHEN status = 'failed' AND (failed_at >= ? OR updated_at >= ?) THEN 1 ELSE 0 END) as failed_today_count", [$todayStart, $todayStart])
+                ->selectRaw("SUM(CASE WHEN status = 'completed' THEN 1 ELSE 0 END) as total_completed_count")
+                ->whereNotNull('crawler_id')
+                ->groupBy('crawler_id')
+                ->get()
+                ->keyBy('crawler_id');
+        });
+
+        // 2. Fetch active domains for displayed nodes in 1 BATCHED QUERY
+        $activeDomainsGrouped = !empty($nodeIds) ? CrawlJob::with('domain')
+            ->whereIn('crawler_id', $nodeIds)
+            ->where('status', 'claimed')
+            ->where('lease_expires_at', '>=', now())
+            ->get()
+            ->groupBy('crawler_id') : collect();
 
         foreach ($nodes as $node) {
-            $cachedStats = \Illuminate\Support\Facades\Cache::remember("crawler_node_stats_{$node->crawler_id}", 30, function () use ($node, $todayStart) {
-                return [
-                    'active_jobs_count' => CrawlJob::where('crawler_id', $node->crawler_id)
-                        ->where('status', 'claimed')
-                        ->where('lease_expires_at', '>=', now())
-                        ->count(),
-                    'completed_today_count' => CrawlJob::where('crawler_id', $node->crawler_id)
-                        ->where('status', 'completed')
-                        ->where(function ($q) use ($todayStart) {
-                            $q->where('completed_at', '>=', $todayStart)
-                              ->orWhere('updated_at', '>=', $todayStart);
-                        })->count(),
-                    'failed_today_count' => CrawlJob::where('crawler_id', $node->crawler_id)
-                        ->where('status', 'failed')
-                        ->where(function ($q) use ($todayStart) {
-                            $q->where('failed_at', '>=', $todayStart)
-                              ->orWhere('updated_at', '>=', $todayStart);
-                        })->count(),
-                    'total_completed_count' => CrawlJob::where('crawler_id', $node->crawler_id)->where('status', 'completed')->count(),
-                ];
-            });
-
-            $node->active_jobs_count = $cachedStats['active_jobs_count'];
-            $node->completed_today_count = $cachedStats['completed_today_count'];
-            $node->failed_today_count = $cachedStats['failed_today_count'];
-            $node->total_completed_count = $cachedStats['total_completed_count'];
-            
-            // Get the list of 30 active unexpired target domains currently being crawled
-            $node->active_domains = CrawlJob::with('domain')
-                ->where('crawler_id', $node->crawler_id)
-                ->where('status', 'claimed')
-                ->where('lease_expires_at', '>=', now())
-                ->limit(30)
-                ->get();
+            $nodeStats = $statsMap->get($node->crawler_id);
+            $node->active_jobs_count = (int) ($nodeStats->active_jobs_count ?? 0);
+            $node->completed_today_count = (int) ($nodeStats->completed_today_count ?? 0);
+            $node->failed_today_count = (int) ($nodeStats->failed_today_count ?? 0);
+            $node->total_completed_count = (int) ($nodeStats->total_completed_count ?? 0);
+            $node->active_domains = $activeDomainsGrouped->get($node->crawler_id, collect())->take(30);
         }
 
         return view('admin.crawlers', compact('nodes'));
