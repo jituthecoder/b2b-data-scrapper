@@ -42,7 +42,7 @@ class CrawlerJobClaimController extends Controller
             $jobIds = CrawlJob::where('status', 'pending')
                 ->when(!empty($allowedTypes), fn($q) => $q->whereIn('job_type', $allowedTypes))
                 ->orderBy('priority', 'desc')
-                ->orderBy('created_at', 'asc')
+                ->orderBy('created_at', 'desc')
                 ->limit($limit)
                 ->lock('FOR UPDATE SKIP LOCKED')
                 ->pluck('id')
