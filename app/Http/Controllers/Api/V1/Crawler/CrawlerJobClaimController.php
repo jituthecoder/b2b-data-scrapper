@@ -38,32 +38,32 @@ class CrawlerJobClaimController extends Controller
 
         // Atomically claim pending jobs using composite B-Tree index (status, priority, created_at)
         $claimedJobs = DB::transaction(function () use ($allowedTypes, $limit, $node) {
-            $query = CrawlJob::with('domain')
-                ->where('status', 'pending');
-
-            if (!empty($allowedTypes)) {
-                $query->whereIn('job_type', $allowedTypes);
-            }
-
-            $jobs = $query->orderBy('priority', 'desc')
+            // 1. Fetch & lock ONLY the top pending job IDs from crawl_jobs table (Sub-millisecond index lookup!)
+            $jobIds = CrawlJob::where('status', 'pending')
+                ->when(!empty($allowedTypes), fn($q) => $q->whereIn('job_type', $allowedTypes))
+                ->orderBy('priority', 'desc')
                 ->orderBy('created_at', 'asc')
                 ->limit($limit)
                 ->lock('FOR UPDATE SKIP LOCKED')
-                ->get();
+                ->pluck('id')
+                ->toArray();
 
-            if ($jobs->isEmpty()) {
+            if (empty($jobIds)) {
                 return [];
             }
 
             $leaseExpiresAt = now()->addMinutes(10);
-            $jobIds = $jobs->pluck('id')->toArray();
 
+            // 2. Mark jobs as claimed
             CrawlJob::whereIn('id', $jobIds)->update([
                 'status' => 'claimed',
                 'crawler_id' => $node->crawler_id,
                 'claimed_at' => now(),
                 'lease_expires_at' => $leaseExpiresAt,
             ]);
+
+            // 3. Eager load domain without locking domains table
+            $jobs = CrawlJob::with('domain')->whereIn('id', $jobIds)->get();
 
             $claimed = [];
             foreach ($jobs as $job) {
