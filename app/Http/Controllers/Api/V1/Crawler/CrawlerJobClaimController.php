@@ -36,25 +36,10 @@ class CrawlerJobClaimController extends Controller
         $capabilityFilter = $request->input('capability');
         $allowedTypes = $capabilityFilter ? [$capabilityFilter] : null;
 
-        // Automatically release any expired claimed jobs from dead workers back to pending
-        CrawlJob::where('status', 'claimed')
-            ->where('lease_expires_at', '<', now())
-            ->update([
-                'status' => 'pending',
-                'crawler_id' => null,
-                'claimed_at' => null,
-                'lease_expires_at' => null,
-            ]);
-
-        // Atomically claim pending OR expired leased jobs
+        // Atomically claim pending jobs using composite B-Tree index (status, priority, created_at)
         $claimedJobs = DB::transaction(function () use ($allowedTypes, $limit, $node) {
-            $query = CrawlJob::with('domain')->where(function ($q) {
-                $q->where('status', 'pending')
-                  ->orWhere(function ($expired) {
-                      $expired->where('status', 'claimed')
-                              ->where('lease_expires_at', '<', now());
-                  });
-            });
+            $query = CrawlJob::with('domain')
+                ->where('status', 'pending');
 
             if (!empty($allowedTypes)) {
                 $query->whereIn('job_type', $allowedTypes);
