@@ -75,6 +75,8 @@ class AdminDashboardWebController extends Controller
             $query->where('is_accessible', true);
         } elseif ($request->input('filter') === 'completed') {
             $query->where('crawl_status', 'completed');
+        } elseif ($request->input('filter') === 'in_progress') {
+            $query->where('crawl_status', 'in_progress');
         }
 
         $domains = $query->orderBy('id', 'desc')->paginate(15)->withQueryString();

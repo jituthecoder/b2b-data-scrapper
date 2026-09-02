@@ -32,10 +32,11 @@
     <div class="table-header">
         <h2 class="table-title">Registered Domains ({{ $domains->total() }})</h2>
         <form method="GET" action="/admin/domains" style="display: flex; gap: 12px; align-items: center;">
-            <select name="filter" class="search-box" style="width: 190px;" onchange="this.form.submit()">
+            <select name="filter" class="search-box" style="width: 210px;" onchange="this.form.submit()">
                 <option value="">All Domains</option>
                 <option value="with_emails" {{ request('filter') === 'with_emails' ? 'selected' : '' }}>📧 With Emails Only</option>
                 <option value="accessible" {{ request('filter') === 'accessible' ? 'selected' : '' }}>🟢 Accessible Only</option>
+                <option value="in_progress" {{ request('filter') === 'in_progress' ? 'selected' : '' }}>⚡ In Progress Crawl</option>
                 <option value="completed" {{ request('filter') === 'completed' ? 'selected' : '' }}>✅ Completed Crawl</option>
             </select>
             <input type="text" name="search" value="{{ request('search') }}" placeholder="Search domain name..." class="search-box">
