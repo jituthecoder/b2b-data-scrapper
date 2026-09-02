@@ -51,7 +51,7 @@ class AdminDashboardWebController extends Controller
             ];
         });
 
-        $recentDomains = Domain::orderBy('created_at', 'desc')->limit(8)->get();
+        $recentDomains = Domain::orderBy('id', 'desc')->limit(8)->get();
         $recentJobs = CrawlJob::with('domain')->orderBy('created_at', 'desc')->limit(8)->get();
 
         return view('admin.dashboard', compact('stats', 'recentDomains', 'recentJobs'));
@@ -77,7 +77,7 @@ class AdminDashboardWebController extends Controller
             $query->where('crawl_status', 'completed');
         }
 
-        $domains = $query->orderBy('created_at', 'desc')->paginate(15)->withQueryString();
+        $domains = $query->orderBy('id', 'desc')->paginate(15)->withQueryString();
 
         return view('admin.domains', compact('domains'));
     }
@@ -154,26 +154,32 @@ class AdminDashboardWebController extends Controller
         $todayStart = now()->startOfDay();
 
         foreach ($nodes as $node) {
-            $node->active_jobs_count = CrawlJob::where('crawler_id', $node->crawler_id)
-                ->where('status', 'claimed')
-                ->where('lease_expires_at', '>=', now())
-                ->count();
-                
-            $node->completed_today_count = CrawlJob::where('crawler_id', $node->crawler_id)
-                ->where('status', 'completed')
-                ->where(function ($q) use ($todayStart) {
-                    $q->where('completed_at', '>=', $todayStart)
-                      ->orWhere('updated_at', '>=', $todayStart);
-                })->count();
+            $cachedStats = \Illuminate\Support\Facades\Cache::remember("crawler_node_stats_{$node->crawler_id}", 30, function () use ($node, $todayStart) {
+                return [
+                    'active_jobs_count' => CrawlJob::where('crawler_id', $node->crawler_id)
+                        ->where('status', 'claimed')
+                        ->where('lease_expires_at', '>=', now())
+                        ->count(),
+                    'completed_today_count' => CrawlJob::where('crawler_id', $node->crawler_id)
+                        ->where('status', 'completed')
+                        ->where(function ($q) use ($todayStart) {
+                            $q->where('completed_at', '>=', $todayStart)
+                              ->orWhere('updated_at', '>=', $todayStart);
+                        })->count(),
+                    'failed_today_count' => CrawlJob::where('crawler_id', $node->crawler_id)
+                        ->where('status', 'failed')
+                        ->where(function ($q) use ($todayStart) {
+                            $q->where('failed_at', '>=', $todayStart)
+                              ->orWhere('updated_at', '>=', $todayStart);
+                        })->count(),
+                    'total_completed_count' => CrawlJob::where('crawler_id', $node->crawler_id)->where('status', 'completed')->count(),
+                ];
+            });
 
-            $node->failed_today_count = CrawlJob::where('crawler_id', $node->crawler_id)
-                ->where('status', 'failed')
-                ->where(function ($q) use ($todayStart) {
-                    $q->where('failed_at', '>=', $todayStart)
-                      ->orWhere('updated_at', '>=', $todayStart);
-                })->count();
-
-            $node->total_completed_count = CrawlJob::where('crawler_id', $node->crawler_id)->where('status', 'completed')->count();
+            $node->active_jobs_count = $cachedStats['active_jobs_count'];
+            $node->completed_today_count = $cachedStats['completed_today_count'];
+            $node->failed_today_count = $cachedStats['failed_today_count'];
+            $node->total_completed_count = $cachedStats['total_completed_count'];
             
             // Get the list of 30 active unexpired target domains currently being crawled
             $node->active_domains = CrawlJob::with('domain')
