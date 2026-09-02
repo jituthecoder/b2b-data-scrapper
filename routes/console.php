@@ -9,5 +9,5 @@ Artisan::command('inspire', function () {
     $this->comment(Inspiring::quote());
 })->purpose('Display an inspiring quote');
 
-// Schedule daily 24-hour automatic pruning of Telescope log entries to keep DB lightweight
-Schedule::command('telescope:prune --hours=24')->daily();
+// Schedule hourly pruning of Telescope log entries (keeps a rolling 12-hour window of 100% full request logs)
+Schedule::command('telescope:prune --hours=12')->hourly();
