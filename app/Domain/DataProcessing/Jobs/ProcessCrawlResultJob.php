@@ -11,6 +11,7 @@ use App\Domain\DataProcessing\EmailNormalizationService;
 use App\Domain\DataProcessing\PhoneNormalizationService;
 use App\Domain\DataProcessing\SocialUrlNormalizationService;
 use App\Domain\Domains\Models\Domain;
+use App\Domain\Domains\Services\FaviconStorageService;
 use App\Domain\Domains\Services\WebsiteScreenshotStorageService;
 use App\Domain\Emails\Models\Email;
 use App\Domain\Integrations\Google\GoogleEmailHarvestingService;
