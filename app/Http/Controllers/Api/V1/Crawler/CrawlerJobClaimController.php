@@ -48,7 +48,7 @@ class CrawlerJobClaimController extends Controller
             $jobs = $query->orderBy('priority', 'desc')
                 ->orderBy('created_at', 'asc')
                 ->limit($limit)
-                ->lockForUpdate()
+                ->lock('FOR UPDATE SKIP LOCKED')
                 ->get();
 
             if ($jobs->isEmpty()) {
