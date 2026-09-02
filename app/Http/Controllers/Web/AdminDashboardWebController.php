@@ -72,26 +72,47 @@ class AdminDashboardWebController extends Controller
     {
         $query = Domain::with(['companies', 'technologies', 'emails']);
 
+        $filter = $request->input('filter');
+        $search = $request->input('search');
+
         if ($request->filled('search')) {
-            $search = $request->input('search');
             $query->where(function ($q) use ($search) {
                 $q->where('domain', 'LIKE', "%{$search}%")
                   ->orWhere('normalized_domain', 'LIKE', "%{$search}%");
             });
         }
 
-        if ($request->input('filter') === 'with_emails') {
+        if ($filter === 'with_emails') {
             $query->has('emails');
-        } elseif ($request->input('filter') === 'accessible') {
+        } elseif ($filter === 'accessible') {
             $query->where('is_accessible', true);
-        } elseif ($request->input('filter') === 'completed') {
+        } elseif ($filter === 'completed') {
             $query->where('crawl_status', 'completed');
-        } elseif ($request->input('filter') === 'in_progress') {
+        } elseif ($filter === 'in_progress') {
             $query->where('crawl_status', 'in_progress');
         }
 
-        $totalCount = \Illuminate\Support\Facades\Cache::remember('domains_total_count', 60, fn() => Domain::count());
-        $domains = $query->orderBy('id', 'desc')->simplePaginate(15)->withQueryString();
+        // Cache total count dynamically per filter/search criteria for 60s
+        $cacheKey = 'domains_count_' . md5(($filter ?? '') . '_' . ($search ?? ''));
+        $totalCount = \Illuminate\Support\Facades\Cache::remember($cacheKey, 60, function () use ($query) {
+            return (clone $query)->count();
+        });
+
+        // Restore full numbered pagination using cached filtered total count
+        $page = \Illuminate\Pagination\LengthAwarePaginator::resolveCurrentPage();
+        $perPage = 15;
+
+        $items = (clone $query)->orderBy('id', 'desc')
+            ->forPage($page, $perPage)
+            ->get();
+
+        $domains = new \Illuminate\Pagination\LengthAwarePaginator(
+            $items,
+            $totalCount,
+            $perPage,
+            $page,
+            ['path' => \Illuminate\Pagination\LengthAwarePaginator::resolveCurrentPath(), 'query' => $request->query()]
+        );
 
         return view('admin.domains', compact('domains', 'totalCount'));
     }
