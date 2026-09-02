@@ -7,7 +7,7 @@
 @section('content')
 <div class="table-card">
     <div class="table-header">
-        <h2 class="table-title">Crawl Jobs Queue ({{ $jobs->total() }})</h2>
+        <h2 class="table-title">Crawl Jobs Queue ({{ number_format($totalCount ?? 0) }})</h2>
         <form method="GET" action="/admin/jobs" style="display: flex; gap: 12px; align-items: center;">
             @if(request('crawler_id'))
                 <input type="hidden" name="crawler_id" value="{{ request('crawler_id') }}">

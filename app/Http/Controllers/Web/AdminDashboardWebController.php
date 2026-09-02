@@ -222,16 +222,22 @@ class AdminDashboardWebController extends Controller
     {
         $query = CrawlJob::with(['domain', 'attempts']);
 
+        $status = $request->input('status');
+        $crawlerId = $request->input('crawler_id');
+
         if ($request->filled('status')) {
-            $query->where('status', $request->input('status'));
+            $query->where('status', $status);
         }
 
         if ($request->filled('crawler_id')) {
-            $query->where('crawler_id', $request->input('crawler_id'));
+            $query->where('crawler_id', $crawlerId);
         }
 
-        $jobs = $query->orderBy('created_at', 'desc')->paginate(15)->withQueryString();
+        $cacheKey = "jobs_count_" . md5(($status ?? '') . '_' . ($crawlerId ?? ''));
+        $totalCount = \Illuminate\Support\Facades\Cache::remember($cacheKey, 30, fn() => (clone $query)->count());
 
-        return view('admin.jobs', compact('jobs'));
+        $jobs = $query->orderBy('created_at', 'desc')->simplePaginate(15)->withQueryString();
+
+        return view('admin.jobs', compact('jobs', 'totalCount'));
     }
 }
