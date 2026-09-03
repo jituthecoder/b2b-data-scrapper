@@ -20,7 +20,7 @@ class AdminDashboardWebController extends Controller
 {
     public function index(): View
     {
-        $stats = \Illuminate\Support\Facades\Cache::remember('admin_dashboard_stats', 86400, function () {
+        $stats = \Illuminate\Support\Facades\Cache::remember('admin_dashboard_stats', 300, function () {
             // 1. Fast table count estimates in PostgreSQL (0.01ms execution!)
             $isPgsql = \Illuminate\Support\Facades\DB::connection()->getDriverName() === 'pgsql';
 

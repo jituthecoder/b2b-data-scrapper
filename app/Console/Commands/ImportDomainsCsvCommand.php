@@ -69,6 +69,8 @@ class ImportDomainsCsvCommand extends Command
 
         fclose($handle);
 
+        \Illuminate\Support\Facades\Cache::forget('admin_dashboard_stats');
+
         $duration = round(microtime(true) - $startTime, 2);
         $this->info("Import complete!");
         $this->info("Total Domains Processed: {$totalProcessed}");
