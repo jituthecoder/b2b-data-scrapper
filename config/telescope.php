@@ -173,7 +173,7 @@ return [
             'ignore_paths' => [],
         ],
 
-        Watchers\JobWatcher::class => env('TELESCOPE_JOB_WATCHER', true),
+        Watchers\JobWatcher::class => env('TELESCOPE_JOB_WATCHER', false),
 
         Watchers\LogWatcher::class => [
             'enabled' => env('TELESCOPE_LOG_WATCHER', true),
@@ -183,9 +183,9 @@ return [
         Watchers\MailWatcher::class => env('TELESCOPE_MAIL_WATCHER', true),
 
         Watchers\ModelWatcher::class => [
-            'enabled' => env('TELESCOPE_MODEL_WATCHER', true),
+            'enabled' => env('TELESCOPE_MODEL_WATCHER', false),
             'events' => ['eloquent.*'],
-            'hydrations' => true,
+            'hydrations' => false,
         ],
 
         Watchers\NotificationWatcher::class => env('TELESCOPE_NOTIFICATION_WATCHER', true),
