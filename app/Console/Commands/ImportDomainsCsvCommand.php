@@ -10,6 +10,7 @@ class ImportDomainsCsvCommand extends Command
     protected $signature = 'import:domains 
                             {file : Path to the CSV file containing domain names} 
                             {--chunk=1000 : Number of domains per background chunk job}
+                            {--skip=0 : Number of domains to skip from beginning}
                             {--sync : Run chunk jobs synchronously instead of queuing}';
 
     protected $description = 'Stream and import multi-million domain CSV dataset using chunked queue jobs';
@@ -18,6 +19,7 @@ class ImportDomainsCsvCommand extends Command
     {
         $filePath = $this->argument('file');
         $chunkSize = (int) $this->option('chunk');
+        $skipCount = (int) $this->option('skip');
         $isSync = (bool) $this->option('sync');
 
         if (!file_exists($filePath)) {
@@ -32,10 +34,15 @@ class ImportDomainsCsvCommand extends Command
         }
 
         $this->info("Starting domain CSV streaming import from: {$filePath}");
+        if ($skipCount > 0) {
+            $this->info("Skipping first {$skipCount} domains...");
+        }
+
         $startTime = microtime(true);
 
         $chunk = [];
         $totalProcessed = 0;
+        $skipped = 0;
         $chunksDispatched = 0;
         while (($data = fgetcsv($handle, 1000, ',')) !== false) {
             $raw = $data[0] ?? '';
@@ -43,6 +50,14 @@ class ImportDomainsCsvCommand extends Command
             $domain = preg_replace('/[^\x20-\x7E]/', '', $domain);
 
             if (empty($domain) || strtolower($domain) === 'domain' || strtolower($domain) === 'url') {
+                continue;
+            }
+
+            if ($skipped < $skipCount) {
+                $skipped++;
+                if ($skipped % 100000 === 0) {
+                    $this->info("[Skipping] Fast-forwarded {$skipped} / {$skipCount} domains...");
+                }
                 continue;
             }
 

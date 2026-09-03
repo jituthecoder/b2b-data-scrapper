@@ -45,4 +45,31 @@ class DomainCsvImportTest extends TestCase
 
         @unlink($tempFile);
     }
+
+    public function test_streaming_csv_domain_import_with_skip(): void
+    {
+        $tempFile = base_path('test_import_domains_skip.csv');
+        $csvContent = "domain\nhttps://domain1.com\nhttps://domain2.com\nhttps://domain3.com\n";
+        file_put_contents($tempFile, $csvContent);
+
+        $this->artisan('import:domains', [
+            'file' => $tempFile,
+            '--skip' => 2,
+            '--sync' => true,
+        ])
+        ->expectsOutput('Import complete!')
+        ->assertExitCode(0);
+
+        $this->assertDatabaseMissing('domains', [
+            'normalized_domain' => 'domain1.com',
+        ]);
+        $this->assertDatabaseMissing('domains', [
+            'normalized_domain' => 'domain2.com',
+        ]);
+        $this->assertDatabaseHas('domains', [
+            'normalized_domain' => 'domain3.com',
+        ]);
+
+        @unlink($tempFile);
+    }
 }
