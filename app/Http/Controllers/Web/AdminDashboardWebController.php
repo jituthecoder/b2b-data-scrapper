@@ -20,33 +20,39 @@ class AdminDashboardWebController extends Controller
 {
     public function index(): View
     {
-        $stats = \Illuminate\Support\Facades\Cache::remember('admin_dashboard_stats', 600, function () {
-            // 1. Grouped CrawlJob counts in 1 single query
+        $stats = \Illuminate\Support\Facades\Cache::remember('admin_dashboard_stats', 86400, function () {
+            // 1. Fast table count estimates in PostgreSQL (0.01ms execution!)
+            $isPgsql = \Illuminate\Support\Facades\DB::connection()->getDriverName() === 'pgsql';
+
+            $getFastCount = function (string $tableName, ?string $whereColumn = null, mixed $whereValue = null) use ($isPgsql) {
+                if ($whereColumn !== null) {
+                    return \Illuminate\Support\Facades\DB::table($tableName)->where($whereColumn, $whereValue)->count();
+                }
+                if ($isPgsql) {
+                    $res = \Illuminate\Support\Facades\DB::selectOne("SELECT reltuples::bigint AS count FROM pg_class WHERE relname = ?", [$tableName]);
+                    if ($res && $res->count > 0) {
+                        return (int) $res->count;
+                    }
+                }
+                return \Illuminate\Support\Facades\DB::table($tableName)->count();
+            };
+
+            // Grouped CrawlJob status counts in 1 single query
             $jobCounts = CrawlJob::select('status', \Illuminate\Support\Facades\DB::raw('COUNT(*) as total'))
                 ->groupBy('status')
                 ->pluck('total', 'status');
 
-            // 2. Domain metrics
-            $totalDomains = Domain::count();
-            $accessibleDomains = Domain::where('is_accessible', true)->count();
-            $completedDomains = Domain::where('crawl_status', 'completed')->count();
-
-            // 3. Crawler Nodes metrics
-            $totalCrawlers = CrawlerNode::count();
-            $activeCrawlers = CrawlerNode::where('status', 'active')->where('last_heartbeat_at', '>=', now()->subMinutes(2))->count();
-            $totalCapacity = CrawlerNode::sum('worker_count');
-
             return [
                 'domains' => [
-                    'total' => $totalDomains,
-                    'accessible' => $accessibleDomains,
-                    'completed' => $completedDomains,
+                    'total' => $getFastCount('domains'),
+                    'accessible' => $getFastCount('domains', 'is_accessible', true),
+                    'completed' => $getFastCount('domains', 'crawl_status', 'completed'),
                 ],
                 'crawlers' => [
-                    'total' => $totalCrawlers,
-                    'active_count' => $activeCrawlers,
-                    'stopped_count' => max(0, $totalCrawlers - $activeCrawlers),
-                    'total_capacity' => (int) $totalCapacity,
+                    'total' => CrawlerNode::count(),
+                    'active_count' => CrawlerNode::where('status', 'active')->where('last_heartbeat_at', '>=', now()->subMinutes(2))->count(),
+                    'stopped_count' => max(0, CrawlerNode::count() - CrawlerNode::where('status', 'active')->where('last_heartbeat_at', '>=', now()->subMinutes(2))->count()),
+                    'total_capacity' => (int) CrawlerNode::sum('worker_count'),
                 ],
                 'jobs' => [
                     'pending' => (int) ($jobCounts->get('pending') ?? 0),
@@ -54,10 +60,10 @@ class AdminDashboardWebController extends Controller
                     'completed' => (int) ($jobCounts->get('completed') ?? 0),
                 ],
                 'entities' => [
-                    'companies' => Company::count(),
-                    'contacts' => Contact::count(),
-                    'emails' => Email::count(),
-                    'technologies' => Technology::count(),
+                    'companies' => $getFastCount('companies'),
+                    'contacts' => $getFastCount('contacts'),
+                    'emails' => $getFastCount('emails'),
+                    'technologies' => $getFastCount('technologies'),
                 ],
             ];
         });
