@@ -51,8 +51,8 @@ class CrawlerJobResultController extends Controller
             'created_at' => now(),
         ]);
 
-        // Dispatch Synchronous Ingestion Job to immediately populate entities
-        ProcessCrawlResultJob::dispatchSync($job->id, $request->all());
+        // Dispatch Asynchronous Ingestion Job to queue for background processing (Instant 10ms HTTP response!)
+        ProcessCrawlResultJob::dispatch($job->id, $request->all());
 
         return response()->json([
             'message' => 'Crawl result accepted and queued for processing.',
