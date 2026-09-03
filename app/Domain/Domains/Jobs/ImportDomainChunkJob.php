@@ -18,7 +18,9 @@ class ImportDomainChunkJob implements ShouldQueue
 
     public function __construct(
         public array $rawDomains
-    ) {}
+    ) {
+        $this->onQueue('imports');
+    }
 
     public function handle(DomainNormalizationService $normalizer): void
     {

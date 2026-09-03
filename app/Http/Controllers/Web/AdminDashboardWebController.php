@@ -20,56 +20,70 @@ class AdminDashboardWebController extends Controller
 {
     public function index(): View
     {
-        $stats = \Illuminate\Support\Facades\Cache::remember('admin_dashboard_stats', 300, function () {
-            // 1. Fast table count estimates in PostgreSQL (0.01ms execution!)
-            $isPgsql = \Illuminate\Support\Facades\DB::connection()->getDriverName() === 'pgsql';
+        try {
+            $stats = \Illuminate\Support\Facades\Cache::remember('admin_dashboard_stats', 300, function () {
+                // 1. Fast table count estimates in PostgreSQL (0.01ms execution!)
+                $isPgsql = \Illuminate\Support\Facades\DB::connection()->getDriverName() === 'pgsql';
 
-            $getFastCount = function (string $tableName, ?string $whereColumn = null, mixed $whereValue = null) use ($isPgsql) {
-                if ($whereColumn !== null) {
-                    return \Illuminate\Support\Facades\DB::table($tableName)->where($whereColumn, $whereValue)->count();
-                }
-                if ($isPgsql) {
-                    $res = \Illuminate\Support\Facades\DB::selectOne("SELECT reltuples::bigint AS count FROM pg_class WHERE relname = ?", [$tableName]);
-                    if ($res && $res->count > 0) {
-                        return (int) $res->count;
+                $getFastCount = function (string $tableName, ?string $whereColumn = null, mixed $whereValue = null) use ($isPgsql) {
+                    if ($whereColumn !== null) {
+                        return \Illuminate\Support\Facades\DB::table($tableName)->where($whereColumn, $whereValue)->count();
                     }
-                }
-                return \Illuminate\Support\Facades\DB::table($tableName)->count();
-            };
+                    if ($isPgsql) {
+                        $res = \Illuminate\Support\Facades\DB::selectOne("SELECT reltuples::bigint AS count FROM pg_class WHERE relname = ?", [$tableName]);
+                        if ($res && $res->count > 0) {
+                            return (int) $res->count;
+                        }
+                    }
+                    return \Illuminate\Support\Facades\DB::table($tableName)->count();
+                };
 
-            // Grouped CrawlJob status counts in 1 single query
-            $jobCounts = CrawlJob::select('status', \Illuminate\Support\Facades\DB::raw('COUNT(*) as total'))
-                ->groupBy('status')
-                ->pluck('total', 'status');
+                // Grouped CrawlJob status counts in 1 single query
+                $jobCounts = CrawlJob::select('status', \Illuminate\Support\Facades\DB::raw('COUNT(*) as total'))
+                    ->groupBy('status')
+                    ->pluck('total', 'status');
 
-            return [
-                'domains' => [
-                    'total' => $getFastCount('domains'),
-                    'accessible' => $getFastCount('domains', 'is_accessible', true),
-                    'completed' => $getFastCount('domains', 'crawl_status', 'completed'),
-                ],
-                'crawlers' => [
-                    'total' => CrawlerNode::count(),
-                    'active_count' => CrawlerNode::where('status', 'active')->where('last_heartbeat_at', '>=', now()->subMinutes(2))->count(),
-                    'stopped_count' => max(0, CrawlerNode::count() - CrawlerNode::where('status', 'active')->where('last_heartbeat_at', '>=', now()->subMinutes(2))->count()),
-                    'total_capacity' => (int) CrawlerNode::sum('worker_count'),
-                ],
-                'jobs' => [
-                    'pending' => (int) ($jobCounts->get('pending') ?? 0),
-                    'claimed' => (int) ($jobCounts->get('claimed') ?? 0),
-                    'completed' => (int) ($jobCounts->get('completed') ?? 0),
-                ],
-                'entities' => [
-                    'companies' => $getFastCount('companies'),
-                    'contacts' => $getFastCount('contacts'),
-                    'emails' => $getFastCount('emails'),
-                    'technologies' => $getFastCount('technologies'),
-                ],
+                return [
+                    'domains' => [
+                        'total' => $getFastCount('domains'),
+                        'accessible' => $getFastCount('domains', 'is_accessible', true),
+                        'completed' => $getFastCount('domains', 'crawl_status', 'completed'),
+                    ],
+                    'crawlers' => [
+                        'total' => CrawlerNode::count(),
+                        'active_count' => CrawlerNode::where('status', 'active')->where('last_heartbeat_at', '>=', now()->subMinutes(2))->count(),
+                        'stopped_count' => max(0, CrawlerNode::count() - CrawlerNode::where('status', 'active')->where('last_heartbeat_at', '>=', now()->subMinutes(2))->count()),
+                        'total_capacity' => (int) CrawlerNode::sum('worker_count'),
+                    ],
+                    'jobs' => [
+                        'pending' => (int) ($jobCounts->get('pending') ?? 0),
+                        'claimed' => (int) ($jobCounts->get('claimed') ?? 0),
+                        'completed' => (int) ($jobCounts->get('completed') ?? 0),
+                    ],
+                    'entities' => [
+                        'companies' => $getFastCount('companies'),
+                        'contacts' => $getFastCount('contacts'),
+                        'emails' => $getFastCount('emails'),
+                        'technologies' => $getFastCount('technologies'),
+                    ],
+                ];
+            });
+        } catch (\Throwable $e) {
+            $stats = [
+                'domains' => ['total' => 0, 'accessible' => 0, 'completed' => 0],
+                'crawlers' => ['total' => 0, 'active_count' => 0, 'stopped_count' => 0, 'total_capacity' => 0],
+                'jobs' => ['pending' => 0, 'claimed' => 0, 'completed' => 0],
+                'entities' => ['companies' => 0, 'contacts' => 0, 'emails' => 0, 'technologies' => 0],
             ];
-        });
+        }
 
-        $recentDomains = Domain::orderBy('id', 'desc')->limit(8)->get();
-        $recentJobs = CrawlJob::with('domain')->orderBy('created_at', 'desc')->limit(8)->get();
+        try {
+            $recentDomains = Domain::orderBy('id', 'desc')->limit(8)->get();
+            $recentJobs = CrawlJob::with('domain')->orderBy('created_at', 'desc')->limit(8)->get();
+        } catch (\Throwable $e) {
+            $recentDomains = collect();
+            $recentJobs = collect();
+        }
 
         return view('admin.dashboard', compact('stats', 'recentDomains', 'recentJobs'));
     }
