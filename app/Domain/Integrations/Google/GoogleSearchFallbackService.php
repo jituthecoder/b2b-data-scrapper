@@ -32,16 +32,24 @@ class GoogleSearchFallbackService
         $maxAttempts = 3;
 
         while ($attempts < $maxAttempts) {
-            $apiKey = $this->keyPool->getNextAvailableKey();
-            if (!$apiKey) {
-                Log::warning("GoogleSearchFallbackService: No available Google API keys for query: {$query}");
+            $keyModel = $this->keyPool->getNextAvailableKeyModel();
+            if ($keyModel) {
+                $apiKey = $keyModel->api_key;
+                $cx = !empty($keyModel->cx) ? $keyModel->cx : $this->cx;
+            } else {
+                $apiKey = $this->keyPool->getNextAvailableKey();
+                $cx = $this->cx;
+            }
+
+            if (!$apiKey || !$cx) {
+                Log::warning("GoogleSearchFallbackService: No available Google API key or CX ID for query: {$query}");
                 return null;
             }
 
             try {
                 $response = Http::timeout(15)->get('https://www.googleapis.com/customsearch/v1', [
                     'key' => $apiKey,
-                    'cx' => $this->cx,
+                    'cx' => $cx,
                     'q' => $query,
                     'num' => 1,
                 ]);

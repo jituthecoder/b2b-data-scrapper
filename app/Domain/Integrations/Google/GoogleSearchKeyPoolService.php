@@ -9,19 +9,23 @@ class GoogleSearchKeyPoolService
 {
     private int $maxDailyPerKey = 95;
 
-    public function getNextAvailableKey(): ?string
+    public function getNextAvailableKeyModel(): ?GoogleApiKey
     {
-        // 1. Query Database Key Pool for least recently used active key
         try {
-            $dbKey = GoogleApiKey::available()
+            return GoogleApiKey::available()
                 ->orderByRaw('last_used_at ASC NULLS FIRST')
                 ->first();
-
-            if ($dbKey) {
-                return $dbKey->api_key;
-            }
         } catch (\Throwable $e) {
             Log::warning("GoogleSearchKeyPoolService DB lookup error: " . $e->getMessage());
+            return null;
+        }
+    }
+
+    public function getNextAvailableKey(): ?string
+    {
+        $dbKey = $this->getNextAvailableKeyModel();
+        if ($dbKey) {
+            return $dbKey->api_key;
         }
 
         // 2. Fallback to Environment Variables if DB is empty
