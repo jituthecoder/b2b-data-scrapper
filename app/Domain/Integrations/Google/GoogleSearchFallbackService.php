@@ -46,8 +46,8 @@ class GoogleSearchFallbackService
                     'num' => 1,
                 ]);
 
-                if ($response->status() === 429 || str_contains($response->body(), 'quotaExceeded')) {
-                    Log::warning("GoogleSearchFallbackService: Key quota exceeded for key prefix " . substr($apiKey, 0, 6));
+                if ($response->status() === 429 || str_contains($response->body(), 'quotaExceeded') || $response->status() === 403) {
+                    Log::warning("GoogleSearchFallbackService: Key error/quota for key prefix " . substr($apiKey, 0, 6) . " (Status {$response->status()})");
                     $this->keyPool->markKeyExhausted($apiKey);
                     $attempts++;
                     continue;
@@ -58,7 +58,9 @@ class GoogleSearchFallbackService
                         'status' => $response->status(),
                         'body' => $response->body(),
                     ]);
-                    return null;
+                    $this->keyPool->markKeyExhausted($apiKey);
+                    $attempts++;
+                    continue;
                 }
 
                 $this->keyPool->incrementUsage($apiKey);
