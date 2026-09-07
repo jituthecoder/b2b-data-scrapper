@@ -27,15 +27,20 @@ class AdminSystemControlWebController extends Controller
         }
 
         $s3Disk = config('filesystems.default', 'public');
-        $s3Bucket = config('filesystems.disks.s3.bucket', 'N/A');
-        $s3Region = config('filesystems.disks.s3.region', 'N/A');
+        $activeWorkers = 0;
+        $pendingJobs = 0;
+        $inProgressJobs = 0;
 
-        $activeWorkers = CrawlerNode::where('status', 'active')
-            ->where('last_heartbeat_at', '>=', now()->subMinutes(2))
-            ->count();
+        try {
+            $activeWorkers = CrawlerNode::where('status', 'active')
+                ->where('last_heartbeat_at', '>=', now()->subMinutes(2))
+                ->count();
 
-        $pendingJobs = CrawlJob::where('status', 'pending')->count();
-        $inProgressJobs = CrawlJob::where('status', 'in_progress')->count();
+            $pendingJobs = CrawlJob::where('status', 'pending')->count();
+            $inProgressJobs = CrawlJob::where('status', 'in_progress')->count();
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::warning("AdminSystemControlWebController DB Error: " . $e->getMessage());
+        }
 
         return view('admin.system-info', [
             'sysStatus' => $status,
