@@ -112,9 +112,19 @@ class AdminDashboardWebController extends Controller
             $query->where('crawl_status', 'in_progress');
         }
 
-        // Cache total count dynamically per filter/search criteria for 60s
+        // Cache total count dynamically per filter/search criteria (fast reltuples estimate for unfiltered 5M+ table)
         $cacheKey = 'domains_count_' . md5(($filter ?? '') . '_' . ($search ?? ''));
-        $totalCount = \Illuminate\Support\Facades\Cache::remember($cacheKey, 60, function () use ($query) {
+        $totalCount = \Illuminate\Support\Facades\Cache::remember($cacheKey, 600, function () use ($query, $filter, $search) {
+            if (empty($filter) && empty($search)) {
+                try {
+                    $est = \Illuminate\Support\Facades\DB::selectOne("SELECT reltuples::bigint AS count FROM pg_class WHERE relname = 'domains'");
+                    if ($est && $est->count > 0) {
+                        return (int) $est->count;
+                    }
+                } catch (\Throwable $e) {
+                    // Fallback to query count if not pgsql
+                }
+            }
             return (clone $query)->count();
         });
 
