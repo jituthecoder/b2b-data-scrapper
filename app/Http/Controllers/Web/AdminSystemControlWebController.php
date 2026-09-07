@@ -27,6 +27,8 @@ class AdminSystemControlWebController extends Controller
         }
 
         $s3Disk = config('filesystems.default', 'public');
+        $s3Bucket = config('filesystems.disks.s3.bucket', 'N/A');
+        $s3Region = config('filesystems.disks.s3.region', 'N/A');
         $activeWorkers = 0;
         $pendingJobs = 0;
         $inProgressJobs = 0;
