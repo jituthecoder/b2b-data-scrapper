@@ -118,22 +118,26 @@ class AdminDashboardWebController extends Controller
             if (empty($filter) && empty($search)) {
                 try {
                     $est = \Illuminate\Support\Facades\DB::selectOne("
-                        SELECT COALESCE(
-                            NULLIF(n_live_tup, 0),
-                            ABS((SELECT reltuples::bigint FROM pg_class WHERE relname = 'domains'))
-                        ) AS count
-                        FROM pg_stat_user_tables
-                        WHERE relname = 'domains'
+                        SELECT ABS(reltuples::bigint) AS count FROM pg_class WHERE relname = 'domains'
                     ");
                     if ($est && abs((int) $est->count) > 0) {
                         return abs((int) $est->count);
                     }
                 } catch (\Throwable $e) {
-                    // Fallback
+                    // Fallback to static estimate
                 }
                 return 5000000;
             }
-            return (clone $query)->count();
+
+            try {
+                if (\Illuminate\Support\Facades\DB::connection()->getDriverName() === 'pgsql') {
+                    \Illuminate\Support\Facades\DB::statement("SET LOCAL statement_timeout = '2000ms'");
+                }
+                return (clone $query)->count();
+            } catch (\Throwable $e) {
+                // If filtered count times out on 5M+ table, return estimated count to prevent 500 error
+                return 5000000;
+            }
         });
 
         // Restore full numbered pagination using cached filtered total count
@@ -297,12 +301,7 @@ class AdminDashboardWebController extends Controller
             if (empty($status) && empty($crawlerId)) {
                 try {
                     $est = \Illuminate\Support\Facades\DB::selectOne("
-                        SELECT COALESCE(
-                            NULLIF(n_live_tup, 0),
-                            ABS((SELECT reltuples::bigint FROM pg_class WHERE relname = 'crawl_jobs'))
-                        ) AS count
-                        FROM pg_stat_user_tables
-                        WHERE relname = 'crawl_jobs'
+                        SELECT ABS(reltuples::bigint) AS count FROM pg_class WHERE relname = 'crawl_jobs'
                     ");
                     if ($est && abs((int) $est->count) > 0) {
                         return abs((int) $est->count);
@@ -312,7 +311,15 @@ class AdminDashboardWebController extends Controller
                 }
                 return 5000000;
             }
-            return (clone $query)->count();
+
+            try {
+                if (\Illuminate\Support\Facades\DB::connection()->getDriverName() === 'pgsql') {
+                    \Illuminate\Support\Facades\DB::statement("SET LOCAL statement_timeout = '2000ms'");
+                }
+                return (clone $query)->count();
+            } catch (\Throwable $e) {
+                return 5000000;
+            }
         });
 
         $jobs = $query->orderBy('created_at', 'desc')->simplePaginate(15)->withQueryString();
