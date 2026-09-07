@@ -285,7 +285,19 @@ class AdminDashboardWebController extends Controller
         }
 
         $cacheKey = "jobs_count_" . md5(($status ?? '') . '_' . ($crawlerId ?? ''));
-        $totalCount = \Illuminate\Support\Facades\Cache::remember($cacheKey, 30, fn() => (clone $query)->count());
+        $totalCount = \Illuminate\Support\Facades\Cache::remember($cacheKey, 300, function () use ($query, $status, $crawlerId) {
+            if (empty($status) && empty($crawlerId)) {
+                try {
+                    $est = \Illuminate\Support\Facades\DB::selectOne("SELECT reltuples::bigint AS count FROM pg_class WHERE relname = 'crawl_jobs'");
+                    if ($est && $est->count > 0) {
+                        return (int) $est->count;
+                    }
+                } catch (\Throwable $e) {
+                    // Fallback
+                }
+            }
+            return (clone $query)->count();
+        });
 
         $jobs = $query->orderBy('created_at', 'desc')->simplePaginate(15)->withQueryString();
 
