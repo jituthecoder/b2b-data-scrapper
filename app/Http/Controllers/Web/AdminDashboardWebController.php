@@ -112,18 +112,26 @@ class AdminDashboardWebController extends Controller
             $query->where('crawl_status', 'in_progress');
         }
 
-        // Cache total count dynamically per filter/search criteria (fast reltuples estimate for unfiltered 5M+ table)
+        // Cache total count dynamically per filter/search criteria (fast reltuples/n_live_tup estimate for unfiltered 5M+ table)
         $cacheKey = 'domains_count_' . md5(($filter ?? '') . '_' . ($search ?? ''));
         $totalCount = \Illuminate\Support\Facades\Cache::remember($cacheKey, 600, function () use ($query, $filter, $search) {
             if (empty($filter) && empty($search)) {
                 try {
-                    $est = \Illuminate\Support\Facades\DB::selectOne("SELECT reltuples::bigint AS count FROM pg_class WHERE relname = 'domains'");
-                    if ($est && $est->count > 0) {
-                        return (int) $est->count;
+                    $est = \Illuminate\Support\Facades\DB::selectOne("
+                        SELECT COALESCE(
+                            NULLIF(n_live_tup, 0),
+                            ABS((SELECT reltuples::bigint FROM pg_class WHERE relname = 'domains'))
+                        ) AS count
+                        FROM pg_stat_user_tables
+                        WHERE relname = 'domains'
+                    ");
+                    if ($est && abs((int) $est->count) > 0) {
+                        return abs((int) $est->count);
                     }
                 } catch (\Throwable $e) {
-                    // Fallback to query count if not pgsql
+                    // Fallback
                 }
+                return 5000000;
             }
             return (clone $query)->count();
         });
@@ -288,13 +296,21 @@ class AdminDashboardWebController extends Controller
         $totalCount = \Illuminate\Support\Facades\Cache::remember($cacheKey, 300, function () use ($query, $status, $crawlerId) {
             if (empty($status) && empty($crawlerId)) {
                 try {
-                    $est = \Illuminate\Support\Facades\DB::selectOne("SELECT reltuples::bigint AS count FROM pg_class WHERE relname = 'crawl_jobs'");
-                    if ($est && $est->count > 0) {
-                        return (int) $est->count;
+                    $est = \Illuminate\Support\Facades\DB::selectOne("
+                        SELECT COALESCE(
+                            NULLIF(n_live_tup, 0),
+                            ABS((SELECT reltuples::bigint FROM pg_class WHERE relname = 'crawl_jobs'))
+                        ) AS count
+                        FROM pg_stat_user_tables
+                        WHERE relname = 'crawl_jobs'
+                    ");
+                    if ($est && abs((int) $est->count) > 0) {
+                        return abs((int) $est->count);
                     }
                 } catch (\Throwable $e) {
                     // Fallback
                 }
+                return 5000000;
             }
             return (clone $query)->count();
         });
