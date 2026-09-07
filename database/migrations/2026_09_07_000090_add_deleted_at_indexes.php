@@ -12,10 +12,6 @@ return new class extends Migration
             $table->index('deleted_at');
         });
 
-        Schema::table('crawl_jobs', function (Blueprint $table) {
-            $table->index('deleted_at');
-        });
-
         Schema::table('crawler_nodes', function (Blueprint $table) {
             $table->index(['crawler_id', 'api_key_hash', 'status']);
         });
@@ -27,8 +23,8 @@ return new class extends Migration
             $table->dropIndex(['deleted_at']);
         });
 
-        Schema::table('crawl_jobs', function (Blueprint $table) {
-            $table->dropIndex(['deleted_at']);
+        Schema::table('crawler_nodes', function (Blueprint $table) {
+            $table->dropIndex(['crawler_id', 'api_key_hash', 'status']);
         });
     }
 };
