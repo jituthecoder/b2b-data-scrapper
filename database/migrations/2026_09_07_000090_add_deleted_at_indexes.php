@@ -15,6 +15,10 @@ return new class extends Migration
         Schema::table('crawl_jobs', function (Blueprint $table) {
             $table->index('deleted_at');
         });
+
+        Schema::table('crawler_nodes', function (Blueprint $table) {
+            $table->index(['crawler_id', 'api_key_hash', 'status']);
+        });
     }
 
     public function down(): void
