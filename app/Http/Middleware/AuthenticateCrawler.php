@@ -22,11 +22,14 @@ class AuthenticateCrawler
         }
 
         $keyHash = hash('sha256', $crawlerKey);
+        $cacheKey = "crawler_auth:{$crawlerId}:{$keyHash}";
 
-        $node = CrawlerNode::where('crawler_id', $crawlerId)
-            ->where('api_key_hash', $keyHash)
-            ->where('status', 'active')
-            ->first();
+        $node = \Illuminate\Support\Facades\Cache::remember($cacheKey, now()->addMinutes(5), function () use ($crawlerId, $keyHash) {
+            return CrawlerNode::where('crawler_id', $crawlerId)
+                ->where('api_key_hash', $keyHash)
+                ->where('status', 'active')
+                ->first();
+        });
 
         if (!$node) {
             return response()->json([
