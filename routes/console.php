@@ -11,3 +11,6 @@ Artisan::command('inspire', function () {
 
 // Schedule hourly pruning of Telescope log entries (keeps a rolling 12-hour window of 100% full request logs)
 Schedule::command('telescope:prune --hours=12')->hourly();
+
+// Automated 24/7 Production Monitoring & Auto-Healing (logs health and fixes to storage/logs/maintenance.log)
+Schedule::command('monitor:production')->everyFiveMinutes();
