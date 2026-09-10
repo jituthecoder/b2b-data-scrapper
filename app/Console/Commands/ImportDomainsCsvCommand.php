@@ -94,8 +94,8 @@ class ImportDomainsCsvCommand extends Command
                     $this->info("[Scanning CSV] Checked {$totalSkipped} lines...");
                 }
 
-                if ($cleanDomain === $targetResumeDomain || str_contains($cleanDomain, $targetResumeDomain)) {
-                    $this->info("SUCCESS! Found last domain '{$cleanDomain}' at CSV line #{$lineIndex}. Resuming import from next line...");
+                if ($cleanDomain === $targetResumeDomain) {
+                    $this->info("SUCCESS! Found exact last DB domain '{$cleanDomain}' at CSV line #{$lineIndex}. Resuming import from next line...");
                     $isSeekingResume = false;
                 }
                 continue;
