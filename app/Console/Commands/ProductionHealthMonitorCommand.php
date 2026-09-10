@@ -21,11 +21,11 @@ class ProductionHealthMonitorCommand extends Command
         $issues = [];
         $actions = [];
 
-        // 1. Check Redis Queue Health
+        // 1. Check System Cache Health
         try {
-            $r = Cache::store('redis');
-            $r->set('health_check_ping', 'ok', 10);
-            $actions[] = "[Queue/Redis] Upstash Redis connected cleanly.";
+            $r = Cache::store();
+            $r->put('health_check_ping', 'ok', 10);
+            $actions[] = "[Cache/Store] Default cache store (" . config('cache.default') . ") working cleanly.";
         } catch (\Throwable $e) {
             $issues[] = "[Queue Error] " . $e->getMessage();
             try {

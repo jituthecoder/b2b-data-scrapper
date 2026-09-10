@@ -118,10 +118,12 @@ class ImportDomainsCsvCommand extends Command
                 $batchesCount++;
                 $chunk = [];
 
-                if ($totalProcessed % 10000 === 0) {
+                if ($totalProcessed % 2000 === 0) {
                     $elapsed = round(microtime(true) - $startTime, 1);
                     $rate = round($totalProcessed / max(1, $elapsed));
                     $this->info("[Progress] Imported " . number_format($totalProcessed) . " new domains (" . number_format($rate) . " domains/sec, Elapsed: {$elapsed}s)");
+                    if (function_exists('ob_flush')) { @ob_flush(); }
+                    @flush();
                 }
             }
         }
