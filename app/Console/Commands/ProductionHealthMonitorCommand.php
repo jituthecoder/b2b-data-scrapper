@@ -47,7 +47,25 @@ class ProductionHealthMonitorCommand extends Command
             $issues[] = "[Database Error] PostgreSQL connection timed out: " . $e->getMessage();
         }
 
-        // 3. Write Activity Log to maintenance.log
+        // 3. Storage & Inode Health Pruning (Clean up raw crawl files, expired sessions, and old logs)
+        try {
+            $crawlsDir = storage_path('app/private/crawls');
+            if (file_exists($crawlsDir)) {
+                $files = glob("{$crawlsDir}/*.json");
+                $deletedCount = 0;
+                foreach ($files as $f) {
+                    if (is_file($f)) {
+                        @unlink($f);
+                        $deletedCount++;
+                    }
+                }
+                if ($deletedCount > 0) {
+                    $actions[] = "[Inode Pruner] Cleaned up {$deletedCount} raw JSON crawl files from storage.";
+                }
+            }
+        } catch (\Throwable $e) {
+            $issues[] = "[Inode Pruner Warning] " . $e->getMessage();
+        }
         $logEntry = "=== Production Monitoring Run [{$timestamp}] ===" . PHP_EOL;
         foreach ($actions as $act) {
             $logEntry .= "INFO: {$act}" . PHP_EOL;

@@ -36,9 +36,11 @@ class CrawlerJobResultController extends Controller
             'completed_at' => now(),
         ]);
 
-        // Save raw JSON payload to disk/S3 abstraction
-        $s3Path = "crawls/raw_{$job->id}_" . time() . ".json";
-        Storage::disk('local')->put($s3Path, json_encode($request->all(), JSON_PRETTY_PRINT));
+        // Optional raw payload archiving (disabled by default to preserve server inodes)
+        if (config('app.save_raw_crawl_files', false)) {
+            $s3Path = "crawls/raw_{$job->id}_" . time() . ".json";
+            Storage::disk('local')->put($s3Path, json_encode($request->all(), JSON_PRETTY_PRINT));
+        }
 
         // Create Crawl Attempt record
         CrawlAttempt::create([
