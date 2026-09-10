@@ -8,7 +8,7 @@ use App\Domain\DataProcessing\DomainNormalizationService;
 use Illuminate\Support\Facades\DB;
 
 $normalizer = app(DomainNormalizationService::class);
-$filePath = '5M_domains.csv';
+$filePath = '5M_domains_clean.csv';
 
 if (!file_exists($filePath)) {
     echo "File not found: {$filePath}\n";
