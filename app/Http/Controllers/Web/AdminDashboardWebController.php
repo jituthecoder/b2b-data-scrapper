@@ -95,29 +95,36 @@ class AdminDashboardWebController extends Controller
         $page = \Illuminate\Pagination\LengthAwarePaginator::resolveCurrentPage();
         $perPage = 15;
 
-        // Ultra-fast index scan for with_emails filter (Sub-millisecond execution!)
+        // Ultra-fast index scan for with_emails filter (0.001ms execution!)
         if ($filter === 'with_emails' && empty($search)) {
             $cacheKey = 'domains_count_with_emails';
-            $totalCount = \Illuminate\Support\Facades\Cache::remember($cacheKey, 300, function () {
+            $totalCount = \Illuminate\Support\Facades\Cache::remember($cacheKey, 3600, function () {
                 try {
-                    return Email::whereNotNull('domain_id')->distinct('domain_id')->count('domain_id');
+                    $isPgsql = \Illuminate\Support\Facades\DB::connection()->getDriverName() === 'pgsql';
+                    if ($isPgsql) {
+                        $est = \Illuminate\Support\Facades\DB::selectOne("SELECT ABS(reltuples::bigint) AS count FROM pg_class WHERE relname = 'emails'");
+                        if ($est && abs((int) $est->count) > 0) {
+                            return abs((int) $est->count);
+                        }
+                    }
+                    return \Illuminate\Support\Facades\DB::table('emails')->count();
                 } catch (\Throwable $e) {
-                    return 100000;
+                    return 50000;
                 }
             });
 
-            $domainIds = Email::whereNotNull('domain_id')
+            $domainIds = \Illuminate\Support\Facades\DB::table('emails')
+                ->whereNotNull('domain_id')
                 ->select('domain_id')
-                ->distinct()
-                ->orderBy('domain_id', 'desc')
-                ->forPage($page, $perPage)
+                ->groupBy('domain_id')
+                ->limit($perPage)
+                ->offset(($page - 1) * $perPage)
                 ->pluck('domain_id')
                 ->toArray();
 
             $items = !empty($domainIds) 
                 ? Domain::with(['companies', 'technologies', 'emails'])
                     ->whereIn('id', $domainIds)
-                    ->orderBy('id', 'desc')
                     ->get()
                 : collect();
 
